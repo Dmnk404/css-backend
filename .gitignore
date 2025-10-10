@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+
+# VSCode / PyCharm
+.vscode/
+.idea/
+
+# macOS / Windows junk
+.DS_Store
+Thumbs.db
+
+# Python cache and logs
+*.log
+
+# Environment variables
+*.env
