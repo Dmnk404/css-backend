@@ -1,9 +1,13 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/csc_db"
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+engine = create_engine(DATABASE_URL, echo=True)
+
+# Session-Klasse
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+# Base-Klasse für Models
+class Base(DeclarativeBase):
+    pass
