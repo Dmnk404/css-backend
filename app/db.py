@@ -11,3 +11,10 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 # Base-Klasse für Models
 class Base(DeclarativeBase):
     pass
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

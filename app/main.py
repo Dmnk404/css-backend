@@ -1,12 +1,16 @@
 from fastapi import FastAPI
-from app.routers import members
 from app.db import Base, engine
-from app.models.member import Member
-app = FastAPI(title="CSC Backend API")
+from app.routers import auth, members
 
+# Datenbanktabellen erstellen, falls sie noch nicht existieren
 Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="CSC Backend")
+
+# Router registrieren
+app.include_router(auth.router)
 app.include_router(members.router)
 
 @app.get("/")
-def read_root():
-    return {"message": "Welcome to the CSC Backend API"}
+def root():
+    return {"message": "CSC Backend API läuft 🚀"}

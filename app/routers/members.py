@@ -2,69 +2,41 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.db import SessionLocal
+from app.db import get_db
 from app.models.member import Member
-from app.schemas.member import MemberCreate, MemberRead
+from app.schemas import MemberCreate, MemberRead, MemberUpdate
+from app.core.auth import get_current_user  # JWT-Dependency für Schutz der Endpoints
 
 router = APIRouter(prefix="/members", tags=["Members"])
 
-# Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Alle Mitglieder
 @router.get("/", response_model=List[MemberRead])
-def get_members(db: Session = Depends(get_db)):
+def read_members(db: Session = Depends(get_db), user = Depends(get_current_user)):
     return db.query(Member).all()
 
-# Einzelnes Mitglied
-@router.get("/{member_id}", response_model=MemberRead)
-def get_member(member_id: int, db: Session = Depends(get_db)):
-    member = db.query(Member).filter(Member.id == member_id).first()
-    if not member:
-        raise HTTPException(status_code=404, detail="Member not found")
-    return member
-
-# Neues Mitglied
 @router.post("/", response_model=MemberRead)
-def create_member(member: MemberCreate, db: Session = Depends(get_db)):
-    # Check for duplicate email
-    existing_member = db.query(Member).filter(Member.email == member.email).first()
-    if existing_member:
-        raise HTTPException(status_code=400, detail="A member with this email already exists")
-    db_member = Member(name=member.name, email=member.email)
-    db.add(db_member)
+def create_member(member: MemberCreate, db: Session = Depends(get_db), user = Depends(get_current_user)):
+    new_member = Member(**member.model_dump())
+    db.add(new_member)
     db.commit()
-    db.refresh(db_member)
-    return db_member
+    db.refresh(new_member)
+    return new_member
 
-# UPDATE – Mitglied bearbeiten
 @router.put("/{member_id}", response_model=MemberRead)
-def update_member(member_id: int, updated_member: MemberCreate, db: Session = Depends(get_db)):
+def update_member(member_id: int, member: MemberUpdate, db: Session = Depends(get_db), user = Depends(get_current_user)):
     db_member = db.query(Member).filter(Member.id == member_id).first()
     if not db_member:
         raise HTTPException(status_code=404, detail="Member not found")
-
-    db_member.name = updated_member.name
-    db_member.email = updated_member.email
-
+    for key, value in member.model_dump(exclude_unset=True).items():
+        setattr(db_member, key, value)
     db.commit()
     db.refresh(db_member)
     return db_member
 
-
-# DELETE – Mitglied löschen
-@router.delete("/{member_id}", status_code=204)
-def delete_member(member_id: int, db: Session = Depends(get_db)):
+@router.delete("/{member_id}")
+def delete_member(member_id: int, db: Session = Depends(get_db), user = Depends(get_current_user)):
     db_member = db.query(Member).filter(Member.id == member_id).first()
     if not db_member:
         raise HTTPException(status_code=404, detail="Member not found")
-
     db.delete(db_member)
     db.commit()
-    return
-
+    return {"detail": "Member deleted"}

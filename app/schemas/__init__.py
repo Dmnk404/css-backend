@@ -1,1 +1,1 @@
-from .member import MemberBase
+from .member import MemberRead, MemberCreate, MemberUpdate
