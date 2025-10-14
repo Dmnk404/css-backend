@@ -1,16 +1,15 @@
-# alembic/env.py
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-# Wir importieren unsere Base und Models
-from app.models import Member  # <--- anpassen, je nachdem wie deine Models organisiert sind
+from app.db import Base
+from app.models import user, member
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = Member.metadata  # <- wichtig für autogenerate
+target_metadata = Base.metadata
 
 def run_migrations_offline():
     url = config.get_main_option("sqlalchemy.url")
