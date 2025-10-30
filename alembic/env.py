@@ -1,13 +1,23 @@
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
+import os
+from dotenv import load_dotenv
 
 from app.db import Base
-from app.models import user, member
+from app.models import user, member  # deine Modelle
+
+# .env laden
+load_dotenv()
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# ENV-Variable für DB
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
 
 target_metadata = Base.metadata
 

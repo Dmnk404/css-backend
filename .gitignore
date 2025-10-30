@@ -20,3 +20,12 @@ Thumbs.db
 
 # Environment variables
 *.env
+
+# Alembic migrations cache
+alembic/versions/__pycache__/
+
+# Python testing cache
+.pytest_cache/
+
+# Docker volumes
+postgres_data/

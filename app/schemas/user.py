@@ -1,12 +1,17 @@
 from pydantic import BaseModel, constr
+from datetime import datetime
 
-class UserCreate(BaseModel):
+class UserBase(BaseModel):
     username: str
-    password: constr(min_length=6, max_length=12)
 
-class UserRead(BaseModel):
+class UserCreate(UserBase):
+    password: constr(min_length=6, max_length=128)
+
+class UserRead(UserBase):
     id: int
-    username: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     class Config:
         orm_mode = True
+

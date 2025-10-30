@@ -1,17 +1,47 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import date
 
 from app.db import get_db
 from app.models.member import Member
 from app.schemas import MemberCreate, MemberRead, MemberUpdate
-from app.core.auth import get_current_user  # JWT-Dependency für Schutz der Endpoints
+from app.routers.auth import get_current_user  # JWT-Dependency für Schutz der Endpoints
 
 router = APIRouter(prefix="/members", tags=["Members"])
 
+
 @router.get("/", response_model=List[MemberRead])
-def read_members(db: Session = Depends(get_db), user = Depends(get_current_user)):
-    return db.query(Member).all()
+def read_members(
+        name: str | None = Query(None, description="Suche nach Mitgliedsnamen (Teilstring)."),
+        birth_date: date | None = Query(None, description="Suche nach exaktem Geburtsdatum (YYYY-MM-DD)."),
+        limit: int = Query(100, ge=1, le=1000, description="Maximale Anzahl der zurückgegebenen Ergebnisse."),
+
+        # Dependencies
+        db: Session = Depends(get_db),
+        user=Depends(get_current_user)
+):
+    """
+    Ruft alle Mitglieder ab oder filtert sie basierend auf optionalen Query-Parametern.
+    """
+    query = db.query(Member)
+
+    # Filter 1: Suche nach Name (fall-unabhängige LIKE-Suche)
+    if name:
+        # Angenommen, dein Member-Modell hat ein Feld 'name'
+        query = query.filter(Member.name.ilike(f"%{name}%"))
+
+    # Filter 2: Suche nach Geburtsdatum
+    if birth_date:
+        # Vergleiche das Geburtsdatum exakt
+        query = query.filter(Member.birth_date == birth_date)
+
+        # Weitere Filter (z.B. nach E-Mail, Status etc.) können hier hinzugefügt werden
+
+    # Pagination/Limit
+    members = query.limit(limit).all()
+
+    return members
 
 @router.post("/", response_model=MemberRead)
 def create_member(member: MemberCreate, db: Session = Depends(get_db), user = Depends(get_current_user)):
