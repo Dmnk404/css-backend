@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, members
+from app.routers import auth, members, password_reset
 
 app = FastAPI(title="CSC Backend", version="1.0.0")
 
@@ -16,6 +16,7 @@ app.add_middleware(
 # --- Router einbinden ---
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(members.router, prefix="/members", tags=["Members"])
+app.include_router(password_reset.router)
 
 # --- Healthcheck / Root ---
 @app.get("/", tags=["Root"])

@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 
 from app.db import Base
-from app.models import user, member  # deine Modelle
+from app.models import password_reset_token
 
 # .env laden
 load_dotenv()

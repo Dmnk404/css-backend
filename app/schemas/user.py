@@ -1,11 +1,12 @@
-from pydantic import BaseModel, constr
+from pydantic import BaseModel, constr, EmailStr
 from datetime import datetime
 
 class UserBase(BaseModel):
     username: str
+    email: EmailStr
 
 class UserCreate(UserBase):
-    password: constr(min_length=6, max_length=128)
+    password: constr(min_length=8, max_length=128)
 
 class UserRead(UserBase):
     id: int
@@ -14,4 +15,3 @@ class UserRead(UserBase):
 
     class Config:
         orm_mode = True
-
