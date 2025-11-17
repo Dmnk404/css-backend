@@ -17,7 +17,7 @@ def test_generate_and_verify_reset_token(db_session):
 
 def test_create_password_reset_entry(db_session):
     """Ensure that a password reset token can be saved and queried."""
-    user = User(username="testuser", email="test@example.com", password_hash="hashedpw")
+    user = User(username="testuser", email="test@example.com", hashed_password="hashedpw")
     db_session.add(user)
     db_session.commit()
 
@@ -41,12 +41,12 @@ def test_create_password_reset_entry(db_session):
 def test_password_reset_flow(client, db_session):
     """Simulate a full password reset request and confirmation."""
     # 1. Create test user
-    user = User(username="flowuser", email="flow@example.com", password_hash="hashedpw")
+    user = User(username="flowuser", email="flow@example.com", hashed_password="hashedpw")
     db_session.add(user)
     db_session.commit()
 
     # 2. Request password reset
-    response = client.post("/auth/request-password-reset", json={"email": "flow@example.com"})
+    response = client.post("/auth/forgot-password", json={"email": "flow@example.com"})
     assert response.status_code == 200
 
     # 3. Get token from DB (simulating email link)
@@ -54,9 +54,18 @@ def test_password_reset_flow(client, db_session):
     assert db_token is not None
 
     # 4. Reset password
+    # request reset token
+    response = client.post("/auth/forgot-password", json={"email": "flow@example.com"})
+    assert response.status_code == 200
+
+    # TESTMODE: The real token is returned
+    token = response.json()["test_token"]
+
     reset_data = {
-        "token": "FAKE-TOKEN-FROM-EMAIL",  # <- hier würdest du den Klartext-Token simulieren
+        "token": token,
         "new_password": "newsecret123"
     }
     response = client.post("/auth/reset-password", json=reset_data)
+    assert response.status_code == 200
+
     assert response.status_code in (200, 204)

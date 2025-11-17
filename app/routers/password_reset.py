@@ -1,4 +1,5 @@
 import logging
+import os
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, UTC, timezone
@@ -24,11 +25,9 @@ def forgot_password(
     db: Session = Depends(get_db),
     background_tasks: BackgroundTasks = None
 ):
-    """
-    Generate a password reset token for the user and simulate sending it via email.
-    """
     user = db.query(User).filter(User.email == email_request.email).first()
 
+    # Sicherheit: gleiche Antwort, egal ob User existiert
     if not user:
         return {"message": "If the email exists, a reset link has been sent."}
 
@@ -36,6 +35,7 @@ def forgot_password(
     hashed_token = hash_reset_token(cleartext_token)
     expires_at = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
+    # Alte Resets löschen
     db.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == user.id
     ).delete()
@@ -58,6 +58,13 @@ def forgot_password(
             print,
             f"SIMULATED EMAIL: Password reset link for {user.email}: /auth/reset-password?token={cleartext_token}"
         )
+
+    # 🚨 TESTMODUS: Echten Token zurückgeben
+    if os.getenv("TESTING") == "1":
+        return {
+            "message": "Reset link sent (test mode).",
+            "test_token": cleartext_token
+        }
 
     return {"message": "If the email exists, a reset link has been sent."}
 

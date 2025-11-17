@@ -1,67 +1,77 @@
 import pytest
-import httpx
 
-
+# -------------------------------
+# 🔹 Registrierungstests
+# -------------------------------
 def test_register_user_success(client):
     """Testet die erfolgreiche Registrierung eines neuen Benutzers."""
     user_data = {
-        "username": "unique_success_user",  # <-- NEU: Eindeutiger Name
+        "username": "unique_success_user",
+        "email": "unique_success_user@example.com",
         "password": "securepassword123"
     }
+
     response = client.post("/auth/register", json=user_data)
 
-    # Hier erwarten wir 201 Created
     assert response.status_code == 201
-    assert "erfolgreich registriert" in response.json().get("message")
+    assert "successfully registered" in response.json().get("message", "")
 
 
 def test_register_user_duplicate(client):
     """Testet die Registrierung eines Benutzers, der bereits existiert."""
-
-    # Stellen Sie sicher, dass dieser Test einen anderen Namen verwendet,
-    # der noch nicht im Erfolgs-Test verwendet wurde.
-    unique_name = "unique_duplicate_user"
     user_data = {
-        "username": unique_name,
+        "username": "duplicate_user",
+        "email": "duplicate_user@example.com",
         "password": "securepassword123"
     }
 
-    # 1. Registriere den Benutzer zuerst erfolgreich
-    client.post("/auth/register", json=user_data)  # Code 201
+    # 1️⃣ Benutzer erfolgreich registrieren
+    first = client.post("/auth/register", json=user_data)
+    assert first.status_code == 201
 
-    # 2. Versuche, ihn erneut zu registrieren
+    # 2️⃣ Versuch, denselben Benutzer erneut zu registrieren
     response = client.post("/auth/register", json=user_data)
-
-    # Prüfe den Fehlerstatuscode
     assert response.status_code == 400
-    assert "Benutzername ist bereits vergeben" in response.json().get("detail")
+    assert "Username is already taken" in response.json().get("detail", "")
 
 
-@pytest.mark.parametrize("username, password, expected_status", [
-    ("testuser_login", "correctpw", 200),
-    ("testuser_login", "wrongpw", 401),
-    ("nonexistent", "anypw", 401),
-])
-def test_login_and_token_creation(client, username, password, expected_status):
-    """Testet Login und JWT-Token-Generierung."""
+# -------------------------------
+# 🔹 Login-Tests
+# -------------------------------
+@pytest.mark.parametrize(
+    "username,password,expected_status,expect_token",
+    [
+        ("testuser_login_success", "correctpw", 200, True),   # ✅ Erfolgreicher Login
+        ("testuser_login_fail", "wrongpw", 401, False),       # ❌ Falsches Passwort
+        ("nonexistent_user", "anypw", 401, False),            # ❌ Unbekannter Benutzer
+    ],
+)
+def test_login_and_token_creation(client, username, password, expected_status, expect_token):
+    """Testet Login und JWT-Token-Generierung unter verschiedenen Bedingungen."""
 
-    # 1. Sicherstellen, dass der Benutzer existiert (nur für den Erfolgsfall)
-    if expected_status == 201:
-        client.post("/auth/register", json={"username": username, "password": password})
+    # 1️⃣ Benutzer anlegen (nur für Erfolgsfall)
+    if expect_token:
+        register_payload = {
+            "username": username,
+            "email": f"{username}@example.com",
+            "password": password
+        }
+        r = client.post("/auth/register", json=register_payload)
+        assert r.status_code == 201, f"Registrierung für Testuser {username} fehlgeschlagen: {r.text}"
 
-    # 2. Login-Anfrage senden (Formular-Daten!)
+    # 2️⃣ Login-Anfrage senden (Form-encoded!)
     login_data = {
         "username": username,
         "password": password,
-        "grant_type": "password",  # Nötig für OAuth2PasswordRequestForm
-        "scope": ""
+        "grant_type": "password",
     }
 
     response = client.post("/auth/login", data=login_data)
-
     assert response.status_code == expected_status
 
-    if expected_status == 201:
-        # Prüfe, ob das Token im richtigen Format zurückkommt
-        assert "access_token" in response.json()
-        assert response.json().get("token_type") == "bearer"
+    if expect_token:
+        data = response.json()
+        assert "access_token" in data
+        assert data.get("token_type") == "bearer"
+    else:
+        assert "access_token" not in response.text

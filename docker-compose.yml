@@ -23,6 +23,7 @@ services:
     container_name: csc_app
     env_file: .env
     environment:
+      PYTHONPATH: /app
       DATABASE_URL: ${DATABASE_URL}
     ports:
       - "8000:8000"
