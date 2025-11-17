@@ -11,10 +11,10 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432
 SQL_ECHO = os.getenv("SQL_ECHO", "false").lower() == "true"
 
 # Create SQLAlchemy engine
-engine = create_engine(DATABASE_URL, echo=SQL_ECHO)
+engine = create_engine(DATABASE_URL, echo=SQL_ECHO, future=True)
 
 # Create session factory
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 # Base model for all ORM classes
 class Base(DeclarativeBase):

@@ -1,7 +1,9 @@
+import os
+import app.models.user
+import app.models.role
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
-import os
 from dotenv import load_dotenv
 
 from app.db import Base

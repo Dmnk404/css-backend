@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
+from app.models import Role
 
 from app.schemas.user import UserCreate
 from app.db import get_db
@@ -31,11 +32,23 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
         )
 
     hashed_pw = get_password_hash(user_data.password)
+
+    # ✅ Standardrolle holen
+    default_role = db.query(Role).filter(Role.name == "Member").first()
+    if not default_role:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Default role not found. Please check database seeding."
+        )
+
+    # ✅ User erstellen mit role
     new_user = User(
         username=user_data.username,
         email=user_data.email,
-        hashed_password=hashed_pw
+        hashed_password=hashed_pw,
+        role=default_role
     )
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -43,6 +56,7 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     print(f"✅ Registered new user: {new_user.username} ({new_user.email})")
 
     return {"message": f"User '{new_user.username}' successfully registered."}
+
 
 
 @router.post("/login")

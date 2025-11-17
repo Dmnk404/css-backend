@@ -1,10 +1,12 @@
-"""Initial final database setup
+"""Initial schema setup with User, Role, and FKs
 
-Revision ID: c10f8018ae18
+Revision ID: d54c5b37d5d2
 Revises: 
-Create Date: 2025-11-03 13:23:11.766876
+Create Date: 2025-11-17 10:04:01.927854
 
 """
+from sqlalchemy.sql import table, column
+from sqlalchemy import Integer, String
 from typing import Sequence, Union
 
 from alembic import op
@@ -12,7 +14,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'c10f8018ae18'
+revision: str = 'd54c5b37d5d2'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -39,6 +41,27 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_members_email'), 'members', ['email'], unique=True)
     op.create_index(op.f('ix_members_id'), 'members', ['id'], unique=False)
+    op.create_table('roles',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('description', sa.String(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_roles_id'), 'roles', ['id'], unique=False)
+    op.create_index(op.f('ix_roles_name'), 'roles', ['name'], unique=True)
+
+    roles_table = table(
+        'roles',
+        column('id', Integer),
+        column('name', String),
+        column('description', String)
+    )
+
+    op.bulk_insert(roles_table, [
+        {'id': 1, 'name': 'Admin', 'description': 'Full access to all systems'},
+        {'id': 2, 'name': 'Member', 'description': 'Standard registered user with basic access'}
+    ])
+
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('username', sa.String(length=255), nullable=False),
@@ -46,6 +69,8 @@ def upgrade() -> None:
     sa.Column('hashed_password', sa.String(length=255), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('role_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
@@ -53,13 +78,13 @@ def upgrade() -> None:
     op.create_index(op.f('ix_users_username'), 'users', ['username'], unique=True)
     op.create_table('password_reset_tokens',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('hashed_token', sa.String(), nullable=False),
+    sa.Column('hashed_token', sa.String(length=128), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.Column('expires_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_password_reset_tokens_hashed_token'), 'password_reset_tokens', ['hashed_token'], unique=False)
+    op.create_index(op.f('ix_password_reset_tokens_hashed_token'), 'password_reset_tokens', ['hashed_token'], unique=True)
     op.create_index(op.f('ix_password_reset_tokens_id'), 'password_reset_tokens', ['id'], unique=False)
     # ### end Alembic commands ###
 
@@ -74,6 +99,9 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_users_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
+    op.drop_index(op.f('ix_roles_name'), table_name='roles')
+    op.drop_index(op.f('ix_roles_id'), table_name='roles')
+    op.drop_table('roles')
     op.drop_index(op.f('ix_members_id'), table_name='members')
     op.drop_index(op.f('ix_members_email'), table_name='members')
     op.drop_table('members')
