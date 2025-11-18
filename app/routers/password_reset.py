@@ -1,10 +1,12 @@
 import logging
 import os
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, UTC, timezone
 
-from app.db import get_db
+from app.db.database import get_db
+# NEU: Service importieren
+from app.services.password_reset_service import get_password_reset_service, PasswordResetService
 from app.models.user import User
 from app.models.password_reset_token import PasswordResetToken
 from app.core.security import (
@@ -12,91 +14,52 @@ from app.core.security import (
     hash_reset_token,
     get_password_hash,
 )
-from app.schemas.common import EmailRequest, PasswordReset
+from app.schemas.common import PasswordResetRequest, PasswordReset
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
-router = APIRouter(prefix="/auth", tags=["Authentication & Password Reset"])
+router = APIRouter(tags=["Authentication & Password Reset"])  # Prefix `/auth` wird in main.py gesetzt
 logger = logging.getLogger(__name__)
 
 
 @router.post("/forgot-password", status_code=200)
 def forgot_password(
-    email_request: EmailRequest,
-    db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None
+        email_request: PasswordResetRequest,
+        background_tasks: BackgroundTasks = None,
+        # NEU: Service-Dependency injizieren
+        service: PasswordResetService = Depends(get_password_reset_service)
 ):
-    user = db.query(User).filter(User.email == email_request.email).first()
+    """
+    Initiates the password reset process by generating a token and simulating sending an email.
+    """
 
-    # Sicherheit: gleiche Antwort, egal ob User existiert
-    if not user:
-        return {"message": "If the email exists, a reset link has been sent."}
-
-    cleartext_token = generate_reset_token()
-    hashed_token = hash_reset_token(cleartext_token)
-    expires_at = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-
-    # Alte Resets löschen
-    db.query(PasswordResetToken).filter(
-        PasswordResetToken.user_id == user.id
-    ).delete()
-    db.commit()
-
-    new_token = PasswordResetToken(
-        hashed_token=hashed_token,
-        user_id=user.id,
-        expires_at=expires_at
+    # Logik an den Service delegieren
+    result_message = service.initiate_reset(
+        email=email_request.email,
+        background_tasks=background_tasks
     )
-    db.add(new_token)
-    db.commit()
-    db.refresh(new_token)
 
-    print(f"🔑 RESET TOKEN (plaintext): {cleartext_token}")
-    print(f"📅 Expires at: {expires_at}")
-
-    if background_tasks:
-        background_tasks.add_task(
-            print,
-            f"SIMULATED EMAIL: Password reset link for {user.email}: /auth/reset-password?token={cleartext_token}"
-        )
-
-    # 🚨 TESTMODUS: Echten Token zurückgeben
     if os.getenv("TESTING") == "1":
         return {
             "message": "Reset link sent (test mode).",
-            "test_token": cleartext_token
+            "test_token": result_message
         }
 
-    return {"message": "If the email exists, a reset link has been sent."}
+    return {"message": result_message}
 
 
 @router.post("/reset-password", status_code=200)
-def reset_password(reset_data: PasswordReset, db: Session = Depends(get_db)):
+def reset_password(
+        reset_data: PasswordReset,
+        # NEU: Service-Dependency injizieren
+        service: PasswordResetService = Depends(get_password_reset_service)
+):
     """
     Validate a reset token and update the user's password.
     """
-    search_hash = hash_reset_token(reset_data.token)
-    reset_token_entry = db.query(PasswordResetToken).filter(
-        PasswordResetToken.hashed_token == search_hash
-    ).first()
 
-    if not reset_token_entry:
-        raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
+    # Logik an den Service delegieren
+    user = service.finalize_reset(reset_data)
 
-    aware_expires_at = reset_token_entry.expires_at.replace(tzinfo=timezone.utc)
-    if aware_expires_at < datetime.now(timezone.utc):
-        db.delete(reset_token_entry)
-        db.commit()
-        raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
-
-    user = reset_token_entry.user
-    new_hashed_password = get_password_hash(reset_data.new_password)
-    user.hashed_password = new_hashed_password
-
-    db.delete(reset_token_entry)
-    db.commit()
-    db.refresh(user)
-
-    print(f"✅ Password updated for: {user.email}")
-    print(f"🔐 New hash: {user.hashed_password[:20]}...")
+    print(f"✅ Password successfully reset for: {user.email}")
 
     return {"message": "Password successfully reset."}

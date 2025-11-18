@@ -1,72 +1,88 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import List, Optional
 from datetime import date
 
-from app.db import get_db
-from app.models.member import Member
-from app.schemas import MemberCreate, MemberRead, MemberUpdate
-from app.routers.auth import get_current_user  # JWT-Dependency für Schutz der Endpoints
+# Service and Schema Imports
+from app.services.member_service import get_member_service, MemberService
+from app.schemas.member import MemberCreate, MemberRead, MemberUpdate
 
+# Dependency Imports
+from app.routers.auth import get_current_user
+from app.core.auth_utils import require_admin
+from app.models.user import User  # Used for type hinting the authenticated admin user
+
+# --- Router Initialization ---
 router = APIRouter(prefix="/members", tags=["Members"])
 
 
 @router.get("/", response_model=List[MemberRead])
 def read_members(
-        name: str | None = Query(None, description="Suche nach Mitgliedsnamen (Teilstring)."),
-        birth_date: date | None = Query(None, description="Suche nach exaktem Geburtsdatum (YYYY-MM-DD)."),
-        limit: int = Query(100, ge=1, le=1000, description="Maximale Anzahl der zurückgegebenen Ergebnisse."),
+        name: Optional[str] = Query(None, description="Search by member name (substring)."),
+        birth_date: Optional[date] = Query(None, description="Search by exact birth date (YYYY-MM-DD)."),
+        limit: int = Query(100, ge=1, le=1000, description="Maximum number of results to return."),
 
-        # Dependencies
-        db: Session = Depends(get_db),
+        member_service: MemberService = Depends(get_member_service),
+        # Authentication required for all users accessing the list
         user=Depends(get_current_user)
 ):
     """
-    Ruft alle Mitglieder ab oder filtert sie basierend auf optionalen Query-Parametern.
+    Retrieves all members or filters them based on optional query parameters.
     """
-    query = db.query(Member)
-
-    # Filter 1: Suche nach Name (fall-unabhängige LIKE-Suche)
-    if name:
-        # Angenommen, dein Member-Modell hat ein Feld 'name'
-        query = query.filter(Member.name.ilike(f"%{name}%"))
-
-    # Filter 2: Suche nach Geburtsdatum
-    if birth_date:
-        # Vergleiche das Geburtsdatum exakt
-        query = query.filter(Member.birth_date == birth_date)
-
-        # Weitere Filter (z.B. nach E-Mail, Status etc.) können hier hinzugefügt werden
-
-    # Pagination/Limit
-    members = query.limit(limit).all()
-
+    # Delegation of logic to the Service Layer
+    members = member_service.get_members(name=name, birth_date=birth_date, limit=limit)
     return members
 
-@router.post("/", response_model=MemberRead)
-def create_member(member: MemberCreate, db: Session = Depends(get_db), user = Depends(get_current_user)):
-    new_member = Member(**member.model_dump())
-    db.add(new_member)
-    db.commit()
-    db.refresh(new_member)
-    return new_member
+
+@router.post("/", response_model=MemberRead, status_code=status.HTTP_201_CREATED)
+def create_member(
+        member: MemberCreate,
+        member_service: MemberService = Depends(get_member_service),
+        # AUTHORIZATION: Only Admins can create a new member
+        admin_user: User = Depends(require_admin)
+):
+    """
+    Creates a new member (Admin only).
+    """
+    return member_service.create_member(member)
+
 
 @router.put("/{member_id}", response_model=MemberRead)
-def update_member(member_id: int, member: MemberUpdate, db: Session = Depends(get_db), user = Depends(get_current_user)):
-    db_member = db.query(Member).filter(Member.id == member_id).first()
+def update_member(
+        member_id: int,
+        member_update: MemberUpdate,
+        member_service: MemberService = Depends(get_member_service),
+        # AUTHORIZATION: Only Admins can update a member
+        admin_user: User = Depends(require_admin)
+):
+    """
+    Updates an existing member by ID (Admin only).
+    """
+    # Check if member exists
+    db_member = member_service.get_member_by_id(member_id)
     if not db_member:
-        raise HTTPException(status_code=404, detail="Member not found")
-    for key, value in member.model_dump(exclude_unset=True).items():
-        setattr(db_member, key, value)
-    db.commit()
-    db.refresh(db_member)
-    return db_member
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
 
-@router.delete("/{member_id}")
-def delete_member(member_id: int, db: Session = Depends(get_db), user = Depends(get_current_user)):
-    db_member = db.query(Member).filter(Member.id == member_id).first()
+    # Update member via service
+    return member_service.update_member(db_member, member_update)
+
+
+@router.delete("/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_member(
+        member_id: int,
+        member_service: MemberService = Depends(get_member_service),
+        # AUTHORIZATION: Only Admins can delete a member
+        admin_user: User = Depends(require_admin)
+):
+    """
+    Deletes a member by ID (Admin only).
+    """
+    # Check if member exists
+    db_member = member_service.get_member_by_id(member_id)
     if not db_member:
-        raise HTTPException(status_code=404, detail="Member not found")
-    db.delete(db_member)
-    db.commit()
-    return {"detail": "Member deleted"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    # Delete member via service
+    member_service.delete_member(db_member)
+    return
+
+    # End of file

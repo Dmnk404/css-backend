@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os  # NEU: Für die Abfrage der Umgebungsvariable
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks  # BackgroundTasks NEU
 from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
-from app.models import Role
 
+# App-spezifische Imports
+from app.models import Role
 from app.schemas.user import UserCreate
-from app.db import get_db
+from app.schemas.common import PasswordResetRequest, PasswordReset  # NEU: Schemas
+from app.db.database import get_db
 from app.models.user import User
 from app.core.security import (
     get_password_hash,
@@ -14,6 +17,7 @@ from app.core.security import (
     SECRET_KEY,
     ALGORITHM,
 )
+from app.services.password_reset_service import get_password_reset_service, PasswordResetService  # NEU: Service
 
 router = APIRouter()
 bearer_scheme = HTTPBearer(auto_error=True)
@@ -24,6 +28,7 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     """
     Register a new user with username, email and password.
     """
+    # ... (Ihre bestehende Logik) ...
     existing_user = db.query(User).filter(User.username == user_data.username).first()
     if existing_user:
         raise HTTPException(
@@ -33,8 +38,8 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
     hashed_pw = get_password_hash(user_data.password)
 
-    # ✅ Standardrolle holen
-    default_role = db.query(Role).filter(Role.name == "Member").first()
+    # ✅ Standardrolle holen (Konsistent "User")
+    default_role = db.query(Role).filter(Role.name == "User").first()
     if not default_role:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -58,12 +63,12 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     return {"message": f"User '{new_user.username}' successfully registered."}
 
 
-
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
     Authenticate user and return JWT token if credentials are valid.
     """
+    # ... (Ihre bestehende Logik) ...
     user = db.query(User).filter(User.username == form_data.username).first()
 
     if not user:
@@ -81,13 +86,63 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+# ----------------------------------------------------------------------
+# NEUE ENDPUNKTE FÜR PASSWORT-RESET
+# ----------------------------------------------------------------------
+
+@router.post("/password-reset-request", status_code=status.HTTP_200_OK)
+def password_reset_request(
+        request: PasswordResetRequest,
+        background_tasks: BackgroundTasks,
+        service: PasswordResetService = Depends(get_password_reset_service),
+):
+    """
+    Startet den Passwort-Reset-Prozess.
+    Gibt den Klartext-Token als 'test_token' zurück, wenn TESTING=1 gesetzt ist.
+    """
+
+    # Der Service gibt entweder den Klartext-Token (im Testmodus) oder die Erfolgsmeldung zurück
+    result = service.initiate_reset(request.email, background_tasks)
+
+    # 🚨 FIX für KeyError: 'test_token'
+    # Wenn wir den Klartext-Token zurückbekommen, verpacken wir ihn für den Test-Client
+    # in das 'test_token'-Feld, das der Test erwartet.
+    if os.getenv("TESTING") == "1" and result != "If the email exists, a reset link has been sent.":
+        return {"test_token": result}
+
+    # Andernfalls die Standard-Erfolgsmeldung zurückgeben
+    return {"message": result}
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+def finalize_password_reset(
+        reset_data: PasswordReset,
+        service: PasswordResetService = Depends(get_password_reset_service),
+):
+    """
+    Validiert den Token und setzt das neue Passwort für den Benutzer.
+    """
+    try:
+        user = service.finalize_reset(reset_data)
+        # Geben Sie eine minimale Antwort zurück, um zu bestätigen, dass es funktioniert hat
+        return {"message": f"Password for user {user.username} successfully updated."}
+    except HTTPException as e:
+        # Leitet Fehler aus dem Service (z.B. ungültiger/abgelaufener Token) weiter
+        raise e
+
+
+# ----------------------------------------------------------------------
+# BESTEHENDE ENDPUNKTE
+# ----------------------------------------------------------------------
+
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: Session = Depends(get_db)
+        credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+        db: Session = Depends(get_db)
 ):
     """
     Retrieve and verify current user from JWT token.
     """
+    # ... (Ihre bestehende Logik) ...
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
