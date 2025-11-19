@@ -4,7 +4,7 @@ from sqlalchemy import func
 from datetime import date
 from fastapi import Depends  # NEU: Depends importieren
 
-from app.db.database import get_db  # NEU: get_db importieren
+from app.db import get_db  # NEU: get_db importieren
 
 from app.models.member import Member
 from app.schemas.member import MemberCreate, MemberUpdate

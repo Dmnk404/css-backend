@@ -1,4 +1,4 @@
-from app.db.database import Base, engine
+from app.db import Base, engine
 
 def init():
     print("Running DB initialization...")

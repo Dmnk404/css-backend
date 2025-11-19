@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, UTC, timezone
 
-from app.db.database import get_db
+from app.db import get_db
 # NEU: Service importieren
 from app.services.password_reset_service import get_password_reset_service, PasswordResetService
 from app.models.user import User

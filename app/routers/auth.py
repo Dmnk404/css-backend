@@ -8,7 +8,7 @@ from jose import JWTError, jwt
 from app.models import Role
 from app.schemas.user import UserCreate
 from app.schemas.common import PasswordResetRequest, PasswordReset  # NEU: Schemas
-from app.db.database import get_db
+from app.db import get_db
 from app.models.user import User
 from app.core.security import (
     get_password_hash,

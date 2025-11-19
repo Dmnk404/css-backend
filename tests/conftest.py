@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.main import app
-from app.db.database import get_db, Base
+from app.db import get_db, Base
 from app.core.security import get_password_hash
 from app.models.user import User
 from app.models.role import Role
