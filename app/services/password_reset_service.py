@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status, BackgroundTasks
 from typing import Optional
 
-from app.db.database import get_db
+from app.db import get_db
 from app.models.user import User
 from app.models.password_reset_token import PasswordResetToken
 from app.core.security import (
