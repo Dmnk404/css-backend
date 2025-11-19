@@ -1,20 +1,20 @@
-"""Initial schema setup with User, Role, and FKs
+"""Initial schema setup with roles and seeding
 
-Revision ID: d54c5b37d5d2
+Revision ID: 4005df710216
 Revises: 
-Create Date: 2025-11-17 10:04:01.927854
+Create Date: 2025-11-18 09:16:25.873193
 
 """
-from sqlalchemy.sql import table, column
-from sqlalchemy import Integer, String
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.sql import table, column
+from sqlalchemy import Integer, String
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'd54c5b37d5d2'
+revision: str = '4005df710216'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -47,9 +47,6 @@ def upgrade() -> None:
     sa.Column('description', sa.String(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_roles_id'), 'roles', ['id'], unique=False)
-    op.create_index(op.f('ix_roles_name'), 'roles', ['name'], unique=True)
-
     roles_table = table(
         'roles',
         column('id', Integer),
@@ -61,7 +58,8 @@ def upgrade() -> None:
         {'id': 1, 'name': 'Admin', 'description': 'Full access to all systems'},
         {'id': 2, 'name': 'Member', 'description': 'Standard registered user with basic access'}
     ])
-
+    op.create_index(op.f('ix_roles_id'), 'roles', ['id'], unique=False)
+    op.create_index(op.f('ix_roles_name'), 'roles', ['name'], unique=True)
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('username', sa.String(length=255), nullable=False),
@@ -69,7 +67,7 @@ def upgrade() -> None:
     sa.Column('hashed_password', sa.String(length=255), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('role_id', sa.Integer(), nullable=False),
+    sa.Column('role_id', sa.Integer(), server_default='2', nullable=False),
     sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

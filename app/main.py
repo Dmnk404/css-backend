@@ -16,7 +16,8 @@ app.add_middleware(
 # --- Router einbinden ---
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(members.router, prefix="/members", tags=["Members"])
-app.include_router(password_reset.router)
+# FIX: Den Password Reset Router ebenfalls unter /auth mounten
+app.include_router(password_reset.router, prefix="/auth", tags=["Authentication & Password Reset"])
 
 # --- Healthcheck / Root ---
 @app.get("/", tags=["Root"])

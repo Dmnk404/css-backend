@@ -1,9 +1,10 @@
 from pydantic import BaseModel, EmailStr, Field
 
-class EmailRequest(BaseModel):
+class PasswordResetRequest(BaseModel):
+    """Schema for requesting a password reset via email."""
     email: EmailStr
 
 class PasswordReset(BaseModel):
-    """Schema für die Eingabe des Reset-Tokens und des neuen Passworts."""
-    token: str = Field(..., description="Der Klartext-Reset-Token aus der E-Mail.")
-    new_password: str = Field(..., min_length=8, description="Das neue Passwort des Benutzers (mindestens 8 Zeichen).")
+    """Scheme for entering the reset token and the new password."""
+    token: str = Field(..., description="The plaintext reset token from the email.")
+    new_password: str = Field(..., min_length=8, description="The user's new password (at least 8 characters).")

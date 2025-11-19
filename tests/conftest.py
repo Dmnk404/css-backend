@@ -1,108 +1,169 @@
 import os
-import uuid
+import sys
 import pytest
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-
+from datetime import date
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import StaticPool
+
+# Ensure project root is visible for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.main import app
-from app.db import Base, get_db
+from app.db.database import get_db, Base
+from app.core.security import get_password_hash
+from app.models.user import User
+from app.models.role import Role
+from app.models.member import Member
 
 
-# Load the .env.test file
-load_dotenv(".env.test")
+# -------------------------------------------------------
+# Test database setup (SQLite in-memory)
+# -------------------------------------------------------
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-assert DATABASE_URL, "DATABASE_URL missing in .env.test"
+TEST_DB_URL = "sqlite:///:memory:"
+
+engine = create_engine(
+    TEST_DB_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+
+TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+# Tabellen erstellen
+Base.metadata.create_all(bind=engine)
+
+# ✅ WICHTIG: Rollen EINMAL initialisieren (nicht in jeder Session)
+def init_roles():
+    """Initialize default roles once."""
+    db = TestingSessionLocal()
+    try:
+        # Prüfen ob Rollen bereits existieren
+        existing_roles = db.query(Role).count()
+        if existing_roles == 0:
+            db.add_all([
+                Role(id=1, name="Admin", description="Administrator"),
+                Role(id=2, name="User", description="Standard application user")
+            ])
+            db.commit()
+    finally:
+        db.close()
+
+# Rollen beim Import initialisieren
+init_roles()
 
 
-@pytest.fixture(scope="session")
-def engine():
-    """
-    Create a shared PostgreSQL engine for the entire testsuite.
-    Schema isolation happens on a per-test basis.
-    """
-    engine = create_engine(
-        DATABASE_URL,
-        future=True,
-        pool_pre_ping=True
-    )
-    yield engine
-    engine.dispose()
-
-
-@pytest.fixture(scope="function")
-def db_schema(engine):
-    """
-    Creates a new PostgreSQL SCHEMA for each test.
-    Runs all tables inside that schema.
-    Cleans up the schema afterward.
-    """
-    schema_name = f"test_schema_{uuid.uuid4().hex[:8]}"
-
-    # Create schema
-    with engine.connect() as conn:
-        conn.execute(text(f"CREATE SCHEMA {schema_name};"))
-        conn.commit()
-
-    # Monkeypatch metadata to use the new schema
-    original_schema = Base.metadata.schema
-    Base.metadata.schema = schema_name
-
-    # Create tables inside the schema
-    Base.metadata.create_all(engine)
-
-    yield schema_name
-
-    # Clean up the schema after the test
-    with engine.connect() as conn:
-        conn.execute(text(f"DROP SCHEMA {schema_name} CASCADE;"))
-        conn.commit()
-
-    # Restore original schema
-    Base.metadata.schema = original_schema
-
+# -------------------------------------------------------
+# DB fixtures
+# -------------------------------------------------------
 
 @pytest.fixture(scope="function")
-def db_session(engine, db_schema):
-    """
-    Create a fresh DB session for each test using the test schema.
-    Uses SAVEPOINT-style rollbacks for strong isolation.
-    """
+def db_session():
+    """Provides a clean database session for each test."""
     connection = engine.connect()
     transaction = connection.begin()
+    session = TestingSessionLocal(bind=connection)
 
-    TestingSessionLocal = sessionmaker(
-        bind=connection,
-        expire_on_commit=False,
-        autocommit=False,
-        autoflush=False,
-        future=True,
-    )
-
-    session = TestingSessionLocal()
-
-    def override_get_db():
-        try:
-            yield session
-        finally:
-            session.close()
-
-    app.dependency_overrides[get_db] = override_get_db
+    # Nur User und Member Tables cleanen, NICHT Roles!
+    session.query(User).delete()
+    session.query(Member).delete()
+    session.commit()
 
     yield session
 
-    # rollback test changes
+    session.close()
     transaction.rollback()
     connection.close()
 
-    app.dependency_overrides.pop(get_db, None)
+
+# -------------------------------------------------------
+# Dependency override for FastAPI
+# -------------------------------------------------------
+
+def override_get_db():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+app.dependency_overrides[get_db] = override_get_db
+
+
+@pytest.fixture(scope="module")
+def client():
+    """FastAPI TestClient using overridden DB."""
+    with TestClient(app) as c:
+        yield c
+
+
+# -------------------------------------------------------
+# Utility: user creation
+# -------------------------------------------------------
+
+def create_test_user(session: Session, username: str, email: str, role_name: str, password: str = "pass"):
+    role = session.query(Role).filter(Role.name == role_name).first()
+    if not role:
+        raise ValueError(f"Role '{role_name}' not found.")
+
+    user = User(
+        username=username,
+        email=email,
+        hashed_password=get_password_hash(password),
+        role_id=role.id,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+# -------------------------------------------------------
+# Auth fixtures
+# -------------------------------------------------------
+
+@pytest.fixture(scope="function")
+def admin_token(client: TestClient, db_session: Session):
+    create_test_user(db_session, "adminuser", "admin@test.com", "Admin", "adminpass")
+
+    login = {"username": "adminuser", "password": "adminpass", "grant_type": "password"}
+    response = client.post("/auth/login", data=login)
+
+    assert response.status_code == 200
+    return response.json()["access_token"]
 
 
 @pytest.fixture(scope="function")
-def client(db_session):
-    """FastAPI test client bound to the isolated test DB."""
-    with TestClient(app) as c:
-        yield c
+def member_token(client: TestClient, db_session: Session):
+    create_test_user(db_session, "memberuser", "member@test.com", "User", "memberpass")
+
+    login = {"username": "memberuser", "password": "memberpass", "grant_type": "password"}
+    response = client.post("/auth/login", data=login)
+
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+# -------------------------------------------------------
+# Member fixture (example entry)
+# -------------------------------------------------------
+
+@pytest.fixture(scope="function")
+def existing_member_id(db_session: Session):
+    member = Member(
+        name="Sample Member",
+        birth_date=date(1990, 5, 20),
+        email="sample@member.com",
+        phone="123456789",
+        address="Test Street",  # ✅ Korrigiert: address statt street
+        postal_code="12345",    # ✅ Korrigiert: postal_code statt zip_code
+        city="Test City",
+        # country entfernt, da nicht im Model
+        active=True,  # ✅ Korrigiert: active statt is_active
+    )
+    db_session.add(member)
+    db_session.commit()
+    db_session.refresh(member)
+    return member.id

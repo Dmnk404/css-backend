@@ -1,4 +1,19 @@
 services:
+  # ----------------------------------------------------
+  # KRITISCH: Erweiterung des 'app' Service aus docker-compose.yml
+  # Alle Tests laufen in DIESEM Container, daher MUSS die Variable hier stehen.
+  # ----------------------------------------------------
+  app:
+    # Nur diese Konfigurationen werden überschrieben/hinzugefügt:
+    environment:
+      # 🚨 DIES IST DIE KRITISCHE EINSTELLUNG für den Testmodus
+      - TESTING=1 
+      # Optional: Wenn Ihr App-Service die DB-Verbindung auch überschreiben muss
+      - DATABASE_URL=postgresql://test_user:test_password@db_test:5432/csc_test
+      
+  # ----------------------------------------------------
+  # Ihre Definition der Test-Datenbank
+  # ----------------------------------------------------
   db_test:
     image: postgres:15
     container_name: csc_postgres_test

@@ -34,5 +34,4 @@ class MemberRead(MemberBase):
     active: bool
     total_amount_received: float
 
-    class Config:
-        model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)

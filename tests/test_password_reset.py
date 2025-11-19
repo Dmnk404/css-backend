@@ -1,7 +1,8 @@
 import pytest
+import os
 from datetime import datetime, timedelta, UTC
 from app.core.security import generate_reset_token, hash_reset_token, verify_reset_token
-from app.models import PasswordResetToken, User
+from app.models import PasswordResetToken, User, Role
 
 
 def test_generate_and_verify_reset_token(db_session):
@@ -17,7 +18,14 @@ def test_generate_and_verify_reset_token(db_session):
 
 def test_create_password_reset_entry(db_session):
     """Ensure that a password reset token can be saved and queried."""
-    user = User(username="testuser", email="test@example.com", hashed_password="hashedpw")
+    # ✅ User mit role_id erstellen
+    role = db_session.query(Role).filter(Role.name == "User").first()
+    user = User(
+        username="testuser",
+        email="test@example.com",
+        hashed_password="hashedpw",
+        role_id=role.id
+    )
     db_session.add(user)
     db_session.commit()
 
@@ -38,29 +46,38 @@ def test_create_password_reset_entry(db_session):
     assert saved_token is not None
     assert verify_reset_token(plain_token, saved_token.hashed_token)
 
-def test_password_reset_flow(client, db_session):
+
+def test_password_reset_flow(client, db_session, monkeypatch):
     """Simulate a full password reset request and confirmation."""
-    # 1. Create test user
-    user = User(username="flowuser", email="flow@example.com", hashed_password="hashedpw")
+
+    # ✅ TESTING=1 setzen für test_token Rückgabe
+    monkeypatch.setenv("TESTING", "1")
+
+    # ✅ 1. Create test user mit role_id
+    role = db_session.query(Role).filter(Role.name == "User").first()
+    user = User(
+        username="flowuser",
+        email="flow@example.com",
+        hashed_password="hashedpw",
+        role_id=role.id
+    )
     db_session.add(user)
     db_session.commit()
 
     # 2. Request password reset
-    response = client.post("/auth/forgot-password", json={"email": "flow@example.com"})
+    response = client.post("/auth/password-reset-request", json={"email": "flow@example.com"})
     assert response.status_code == 200
 
-    # 3. Get token from DB (simulating email link)
+    # ✅ TESTMODE: The real token is returned
+    response_data = response.json()
+    assert "test_token" in response_data, f"Expected 'test_token' in response, got: {response_data}"
+    token = response_data["test_token"]
+
+    # 3. Get token from DB (simulating email link) - zur Validierung
     db_token = db_session.query(PasswordResetToken).filter_by(user_id=user.id).first()
     assert db_token is not None
 
-    # 4. Reset password
-    # request reset token
-    response = client.post("/auth/forgot-password", json={"email": "flow@example.com"})
-    assert response.status_code == 200
-
-    # TESTMODE: The real token is returned
-    token = response.json()["test_token"]
-
+    # 4. Reset password with the token
     reset_data = {
         "token": token,
         "new_password": "newsecret123"
@@ -68,4 +85,6 @@ def test_password_reset_flow(client, db_session):
     response = client.post("/auth/reset-password", json=reset_data)
     assert response.status_code == 200
 
-    assert response.status_code in (200, 204)
+    response_data = response.json()
+    assert "message" in response_data
+    assert "flowuser" in response_data["message"]
