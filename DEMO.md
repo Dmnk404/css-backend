@@ -1,3 +1,23 @@
+```markdown
+# Kurze Demo-Anleitung (DEMO.md)
+
+Zweck
+-----
+Diese Datei zeigt in wenigen Schritten, wie du die Kern‑Flows der API demonstrierst:
+- Benutzer registrieren / einloggen (JWT)
+- Mitglieder anlegen / abrufen (geschützter CRUD‑Flow)
+- Nutzung der automatisch generierten API‑Docs (/docs)
+
+Wichtiger Hinweis vor der Registrierung
+--------------------------------------
+Die Registrierung legt neue Nutzer an, erwartet aber in der Datenbank eine Standard‑Rolle mit dem Namen "Member". Falls diese Rolle nicht vorhanden ist, schlägt die Registrierung mit einem Fehler (HTTP 500, "Default role not found") fehl.
+
+Am einfachsten legst du die Rolle per Seed‑Script an (empfohlen):
+```bash
+# führt das Seed-Script aus, welches Role 'Member', einen admin user und Demo-Members erstellt
+docker-compose exec app python app/scripts/seed.py
+```
+
 Quickstart (lokal per Docker)
 -----------------------------
 1. Repository klonen und in das Verzeichnis wechseln:
@@ -20,15 +40,12 @@ docker-compose exec app alembic upgrade head
 - Swagger / OpenAPI UI: http://localhost:8000/docs
 - Root / health: http://localhost:8000/
 
-Wichtiger Hinweis: In der Entwicklungs‑Docker‑Konfiguration wird uvicorn mit `--reload` gestartet. Für Produktion nicht verwenden.
-
 Schnelle Demo‑Daten (optional)
 ------------------------------
-- Falls ein Seed‑Script existiert (z. B. `app/scripts/seed.py`), kann das ausgeführt werden:
+- Seed script (legt Role 'Member', admin user und Beispiel‑Members an):
 ```bash
 docker-compose exec app python app/scripts/seed.py
 ```
-- Ansonsten kannst du die folgenden Requests benutzen, um schnell einen Testnutzer und einige Members anzulegen.
 
 Demo‑Flows (curl‑Beispiele)
 --------------------------
@@ -66,10 +83,6 @@ Merke dir das `<JWT_TOKEN>` für geschützte Requests.
 curl -X GET http://localhost:8000/auth/me \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
-Beispielantwort:
-```json
-{"id":1,"username":"demo_user","email":"demo@example.com"}
-```
 
 4) Member anlegen (geschützt)
 ```bash
@@ -83,14 +96,12 @@ curl -X POST http://localhost:8000/members \
     "notes": "Demo-Mitglied"
   }'
 ```
-Erwartete Minimalantwort (HTTP 201/200): JSON mit dem angelegten Member (id, Felder).
 
 5) Alle Members listen (Pagination‑Beispiel)
 ```bash
 curl -X GET "http://localhost:8000/members?limit=10&offset=0" \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
-Antwort: Liste der Member‑Objekte im JSON‑Array.
 
 6) Einzelnes Member abrufen
 ```bash
@@ -104,19 +115,4 @@ Tipps für die Präsentation
 - Zeige kurz die Registrierung → Login → Ausgabe des JWT → Verwendung des JWT für einen geschützten POST/GET.
 - Falls die Demo live gezeigt wird, lade vorher Seed‑Daten, damit die Listen gefüllt sind.
 - Erwähne in der Präsentation: Datenbank ist PostgreSQL (in Docker Compose), Migrationen per Alembic, Auth per JWT (security in `app/core/security.py`), Validierung per Pydantic‑Schemas.
-
-Fehlerbehebung während Demo
----------------------------
-- Falls ein Endpoint 500 liefert: Logs anschauen:
-```bash
-docker-compose logs -f app
-```
-- Falls Token als „invalid or expired“ abgelehnt wird: Zeit auf dem Demo‑Rechner prüfen / Token neulogin ausführen.
-
-Weitere Hinweise
-----------------
-- OpenAPI JSON: http://localhost:8000/openapi.json (kann exportiert oder in Postman/Insomnia importiert werden)
-- Tests lokal ausführen:
-```bash
-docker-compose exec app python -m pytest tests/
 ```
