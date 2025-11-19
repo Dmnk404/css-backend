@@ -4,49 +4,57 @@ Seed script for css-backend.
 
 - Creates Role 'Member' if it doesn't exist
 - Creates an admin/test user (username: admin / password: adminpass) if not present
-- Creates a few example Members
-
+- Creates a few example Members, filling all NOT NULL fields
 Usage:
   # inside container:
   python app/scripts/seed.py
 
-  # or locally (ensure PYTHONPATH includes project root and env vars set):
-  python app/scripts/seed.py
+Make sure to run migrations first:
+  docker-compose exec app alembic upgrade head
 """
-from datetime import datetime
+from datetime import date
 from app.db import SessionLocal
 from app.core.security import get_password_hash
-# Models import: Role is exported from app.models, User is in app.models.user, Member may be in app.models.member
-try:
-    from app.models import Role
-except Exception:
-    from app.models.role import Role  # fallback
 
-try:
-    from app.models.user import User
-except Exception:
-    from app.models import User  # fallback
+# Import models (adjust if your repo exports differently)
+from app.models.role import Role
+from app.models.user import User
+from app.models.member import Member
 
-# Try Member model imports (adjust per repo structure)
-try:
-    from app.models.member import Member
-except Exception:
-    try:
-        from app.models import Member
-    except Exception:
-        Member = None
-
-SEED_MEMBERS = [
-    {"first_name": "Max", "last_name": "Mustermann", "email": "max@example.com", "notes": "Demo"},
-    {"first_name": "Erika", "last_name": "Mustermann", "email": "erika@example.com", "notes": "Demo"},
-    {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@demo.org", "notes": "Demo"},
-    {"first_name": "Alan", "last_name": "Turing", "email": "alan@demo.org", "notes": "Demo"},
+EXAMPLE_MEMBERS = [
+    {
+        "name": "Max Mustermann",
+        "email": "max@example.com",
+        "birth_date": date(1990, 1, 1),
+        "address": "Musterstraße 1",
+        "city": "Musterstadt",
+        "postal_code": "12345",
+        "phone": "0123-456789",
+    },
+    {
+        "name": "Erika Mustermann",
+        "email": "erika@example.com",
+        "birth_date": date(1985, 5, 12),
+        "address": "Beispielweg 2",
+        "city": "Beispielstadt",
+        "postal_code": "23456",
+        "phone": "0123-987654",
+    },
+    {
+        "name": "Ada Lovelace",
+        "email": "ada@demo.org",
+        "birth_date": date(1992, 12, 10),
+        "address": "Algorithmus Allee 3",
+        "city": "Codecity",
+        "postal_code": "34567",
+        "phone": "030-1234567",
+    },
 ]
 
 def main():
     db = SessionLocal()
     try:
-        # Ensure Role 'Member' exists
+        # Role 'Member'
         role = db.query(Role).filter(Role.name == "Member").first()
         if not role:
             role = Role(name="Member")
@@ -55,7 +63,7 @@ def main():
             db.refresh(role)
             print("Created Role 'Member'")
 
-        # Ensure admin user exists
+        # Admin user
         admin = db.query(User).filter(User.username == "admin").first()
         if not admin:
             admin = User(
@@ -69,26 +77,28 @@ def main():
             db.refresh(admin)
             print("Created admin user (username=admin, password=adminpass)")
 
-        # Create example members if Member model present
-        if Member is None:
-            print("Warning: Member model not found in app.models.member or app.models. Skipping seeding members.")
+        # Seed Members only if none exist (to avoid duplicates)
+        existing_count = db.query(Member).count()
+        if existing_count == 0:
+            for m in EXAMPLE_MEMBERS:
+                # double-check unique email
+                if db.query(Member).filter(Member.email == m["email"]).first():
+                    continue
+                member = Member(
+                    name=m["name"],
+                    email=m["email"],
+                    birth_date=m["birth_date"],
+                    address=m["address"],
+                    city=m["city"],
+                    postal_code=m["postal_code"],
+                    phone=m.get("phone"),
+                    # join_date, active, total_amount_received, created_at use DB defaults
+                )
+                db.add(member)
+            db.commit()
+            print(f"Seeded {len(EXAMPLE_MEMBERS)} example members")
         else:
-            existing = db.query(Member).count()
-            if existing == 0:
-                for m in SEED_MEMBERS:
-                    obj = Member(
-                        first_name=m["first_name"],
-                        last_name=m["last_name"],
-                        email=m["email"],
-                        notes=m.get("notes", ""),
-                        created_at=getattr(Member, "created_at", datetime.utcnow())
-                    )
-                    db.add(obj)
-                db.commit()
-                print(f"Seeded {len(SEED_MEMBERS)} example members")
-            else:
-                print(f"Members already present in DB ({existing}), skipping member seeding.")
-
+            print(f"{existing_count} members already present, skipping member seeding.")
         print("Seed finished.")
     except Exception as e:
         print("Seed failed:", e)
