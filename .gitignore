@@ -3,31 +3,70 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtual environment
+# Virtual environments
 venv/
-.env/
+.venv/
+ENV/
+env/
+env.bak/
+venv.bak/
 
-# VSCode / PyCharm
+# Python environment/tooling
+.python-version
+.pdm-python
+
+# dotenv / env files (do NOT commit secrets)
+.env
+.env.*
+*.env
+
+# IDEs / editors
 .vscode/
 .idea/
+*.sublime-workspace
+*.sublime-project
 
-# macOS / Windows junk
+# macOS / Windows
 .DS_Store
 Thumbs.db
 
-# Python cache and logs
+# Testing / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Caches / tool caches
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Logs
 *.log
 
-# Environment variables
-*.env
+# Packaging / build
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
 
-# Alembic migrations cache
-alembic/versions/__pycache__/
-
-# Python testing cache
-.pytest_cache/
-
-# Docker volumes
-postgres_data/
-
+# SQLite / DB files
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
 test.db
+
+# Docker / local volumes
+postgres_data/
+.docker/
+docker-compose.override.yml
+
+# Misc / local settings
+instance/
+local_settings.py
+*.local
+
+# Temporary / OS
+*.tmp
+*.swp
