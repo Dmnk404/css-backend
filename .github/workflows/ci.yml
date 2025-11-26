@@ -8,6 +8,10 @@ on:
 
 jobs:
   test:
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES || '60' }}
+      DATABASE_URL: sqlite:///./test.db
     runs-on: ubuntu-latest
     strategy:
       matrix:
