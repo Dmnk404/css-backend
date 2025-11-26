@@ -1,5 +1,7 @@
 from fastapi import Depends, HTTPException, status
+
 from app.models.user import User
+
 # Wir importieren die get_current_user Funktion aus dem Auth Router
 from app.routers.auth import get_current_user
 

@@ -1,23 +1,34 @@
 import os  # NEU: Für die Abfrage der Umgebungsvariable
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks  # BackgroundTasks NEU
-from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
+
+from fastapi import BackgroundTasks  # BackgroundTasks NEU
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+    OAuth2PasswordRequestForm,
+)
 from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+
+from app.core.security import (
+    ALGORITHM,
+    SECRET_KEY,
+    create_access_token,
+    get_password_hash,
+    verify_password,
+)
+from app.db import get_db
 
 # App-spezifische Imports
 from app.models import Role
-from app.schemas.user import UserCreate
-from app.schemas.common import PasswordResetRequest, PasswordReset  # NEU: Schemas
-from app.db import get_db
 from app.models.user import User
-from app.core.security import (
-    get_password_hash,
-    verify_password,
-    create_access_token,
-    SECRET_KEY,
-    ALGORITHM,
+from app.schemas.common import PasswordReset  # NEU: Schemas
+from app.schemas.common import PasswordResetRequest
+from app.schemas.user import UserCreate
+from app.services.password_reset_service import (  # NEU: Service
+    PasswordResetService,
+    get_password_reset_service,
 )
-from app.services.password_reset_service import get_password_reset_service, PasswordResetService  # NEU: Service
 
 router = APIRouter()
 bearer_scheme = HTTPBearer(auto_error=True)
@@ -43,7 +54,7 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     if not default_role:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Default role not found. Please check database seeding."
+            detail="Default role not found. Please check database seeding.",
         )
 
     # ✅ User erstellen mit role
@@ -51,7 +62,7 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed_pw,
-        role=default_role
+        role=default_role,
     )
 
     db.add(new_user)
@@ -64,7 +75,9 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+):
     """
     Authenticate user and return JWT token if credentials are valid.
     """
@@ -77,7 +90,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     # Debug output for login troubleshooting
     print(f"👤 Login attempt for: {form_data.username}")
     print(f"🔍 Stored hash: {user.hashed_password[:20]}...")
-    print(f"🔑 Password valid: {verify_password(form_data.password, user.hashed_password)}")
+    print(
+        f"🔑 Password valid: {verify_password(form_data.password, user.hashed_password)}"
+    )
 
     if not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid username or password")
@@ -90,11 +105,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 # NEUE ENDPUNKTE FÜR PASSWORT-RESET
 # ----------------------------------------------------------------------
 
+
 @router.post("/password-reset-request", status_code=status.HTTP_200_OK)
 def password_reset_request(
-        request: PasswordResetRequest,
-        background_tasks: BackgroundTasks,
-        service: PasswordResetService = Depends(get_password_reset_service),
+    request: PasswordResetRequest,
+    background_tasks: BackgroundTasks,
+    service: PasswordResetService = Depends(get_password_reset_service),
 ):
     """
     Startet den Passwort-Reset-Prozess.
@@ -107,7 +123,10 @@ def password_reset_request(
     # 🚨 FIX für KeyError: 'test_token'
     # Wenn wir den Klartext-Token zurückbekommen, verpacken wir ihn für den Test-Client
     # in das 'test_token'-Feld, das der Test erwartet.
-    if os.getenv("TESTING") == "1" and result != "If the email exists, a reset link has been sent.":
+    if (
+        os.getenv("TESTING") == "1"
+        and result != "If the email exists, a reset link has been sent."
+    ):
         return {"test_token": result}
 
     # Andernfalls die Standard-Erfolgsmeldung zurückgeben
@@ -116,8 +135,8 @@ def password_reset_request(
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
 def finalize_password_reset(
-        reset_data: PasswordReset,
-        service: PasswordResetService = Depends(get_password_reset_service),
+    reset_data: PasswordReset,
+    service: PasswordResetService = Depends(get_password_reset_service),
 ):
     """
     Validiert den Token und setzt das neue Passwort für den Benutzer.
@@ -135,9 +154,10 @@ def finalize_password_reset(
 # BESTEHENDE ENDPUNKTE
 # ----------------------------------------------------------------------
 
+
 def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-        db: Session = Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
 ):
     """
     Retrieve and verify current user from JWT token.

@@ -1,22 +1,22 @@
 import os
 import sys
-import pytest
 from datetime import date
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 # Ensure project root is visible for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.main import app
-from app.db import get_db, Base
 from app.core.security import get_password_hash
-from app.models.user import User
-from app.models.role import Role
+from app.db import Base, get_db
+from app.main import app
 from app.models.member import Member
-
+from app.models.role import Role
+from app.models.user import User
 
 # -------------------------------------------------------
 # Test database setup (SQLite in-memory)
@@ -35,6 +35,7 @@ TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=Fals
 # Tabellen erstellen
 Base.metadata.create_all(bind=engine)
 
+
 # ✅ WICHTIG: Rollen EINMAL initialisieren (nicht in jeder Session)
 def init_roles():
     """Initialize default roles once."""
@@ -43,13 +44,16 @@ def init_roles():
         # Prüfen ob Rollen bereits existieren
         existing_roles = db.query(Role).count()
         if existing_roles == 0:
-            db.add_all([
-                Role(id=1, name="Admin", description="Administrator"),
-                Role(id=2, name="User", description="Standard application user")
-            ])
+            db.add_all(
+                [
+                    Role(id=1, name="Admin", description="Administrator"),
+                    Role(id=2, name="User", description="Standard application user"),
+                ]
+            )
             db.commit()
     finally:
         db.close()
+
 
 # Rollen beim Import initialisieren
 init_roles()
@@ -58,6 +62,7 @@ init_roles()
 # -------------------------------------------------------
 # DB fixtures
 # -------------------------------------------------------
+
 
 @pytest.fixture(scope="function")
 def db_session():
@@ -82,12 +87,14 @@ def db_session():
 # Dependency override for FastAPI
 # -------------------------------------------------------
 
+
 def override_get_db():
     db = TestingSessionLocal()
     try:
         yield db
     finally:
         db.close()
+
 
 app.dependency_overrides[get_db] = override_get_db
 
@@ -103,7 +110,10 @@ def client():
 # Utility: user creation
 # -------------------------------------------------------
 
-def create_test_user(session: Session, username: str, email: str, role_name: str, password: str = "pass"):
+
+def create_test_user(
+    session: Session, username: str, email: str, role_name: str, password: str = "pass"
+):
     role = session.query(Role).filter(Role.name == role_name).first()
     if not role:
         raise ValueError(f"Role '{role_name}' not found.")
@@ -124,6 +134,7 @@ def create_test_user(session: Session, username: str, email: str, role_name: str
 # Auth fixtures
 # -------------------------------------------------------
 
+
 @pytest.fixture(scope="function")
 def admin_token(client: TestClient, db_session: Session):
     create_test_user(db_session, "adminuser", "admin@test.com", "Admin", "adminpass")
@@ -139,7 +150,11 @@ def admin_token(client: TestClient, db_session: Session):
 def member_token(client: TestClient, db_session: Session):
     create_test_user(db_session, "memberuser", "member@test.com", "User", "memberpass")
 
-    login = {"username": "memberuser", "password": "memberpass", "grant_type": "password"}
+    login = {
+        "username": "memberuser",
+        "password": "memberpass",
+        "grant_type": "password",
+    }
     response = client.post("/auth/login", data=login)
 
     assert response.status_code == 200
@@ -150,6 +165,7 @@ def member_token(client: TestClient, db_session: Session):
 # Member fixture (example entry)
 # -------------------------------------------------------
 
+
 @pytest.fixture(scope="function")
 def existing_member_id(db_session: Session):
     member = Member(
@@ -158,7 +174,7 @@ def existing_member_id(db_session: Session):
         email="sample@member.com",
         phone="123456789",
         address="Test Street",  # ✅ Korrigiert: address statt street
-        postal_code="12345",    # ✅ Korrigiert: postal_code statt zip_code
+        postal_code="12345",  # ✅ Korrigiert: postal_code statt zip_code
         city="Test City",
         # country entfernt, da nicht im Model
         active=True,  # ✅ Korrigiert: active statt is_active

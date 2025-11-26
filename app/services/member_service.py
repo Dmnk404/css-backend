@@ -1,11 +1,10 @@
-from typing import List, Optional, Type
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 from datetime import date
+from typing import List, Optional
+
 from fastapi import Depends  # NEU: Depends importieren
+from sqlalchemy.orm import Session
 
 from app.db import get_db  # NEU: get_db importieren
-
 from app.models.member import Member
 from app.schemas.member import MemberCreate, MemberUpdate
 
@@ -23,10 +22,10 @@ class MemberService:
         return self.db.query(Member).filter(Member.id == member_id).first()
 
     def get_members(
-            self,
-            name: Optional[str] = None,
-            birth_date: Optional[date] = None,
-            limit: int = 100
+        self,
+        name: Optional[str] = None,
+        birth_date: Optional[date] = None,
+        limit: int = 100,
     ) -> List[Member]:
         """Ruft Mitglieder ab, mit optionaler Filterung."""
         query = self.db.query(Member)

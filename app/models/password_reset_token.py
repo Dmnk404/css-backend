@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+
 from app.db import Base
+
 
 class PasswordResetToken(Base):
     """
@@ -14,11 +15,14 @@ class PasswordResetToken(Base):
     - expires_at: timezone-aware expiration timestamp
     - user: relationship back to User
     """
+
     __tablename__ = "password_reset_tokens"
 
     id = Column(Integer, primary_key=True, index=True)
     hashed_token = Column(String(128), index=True, nullable=False, unique=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     expires_at = Column(DateTime(timezone=True), nullable=False)
 
     # relationship to User; User must define `reset_tokens = relationship(..., back_populates="user")`

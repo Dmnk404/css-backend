@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
+
 from app.db import Base
 
 
@@ -14,11 +15,7 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     reset_tokens = relationship("PasswordResetToken", back_populates="user")
     role_id = Column(
-            Integer,
-            ForeignKey("roles.id"),
-            nullable=False,
-            server_default="2",
-            default=2
+        Integer, ForeignKey("roles.id"), nullable=False, server_default="2", default=2
     )
     role = relationship("Role", back_populates="users")
 

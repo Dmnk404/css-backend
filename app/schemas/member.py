@@ -1,6 +1,8 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
 from datetime import date
 from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr
+
 
 class MemberBase(BaseModel):
     name: str
@@ -11,10 +13,12 @@ class MemberBase(BaseModel):
     postal_code: str
     phone: Optional[str] = None
 
+
 class MemberCreate(MemberBase):
     join_date: Optional[date] = None  # optional, DB-Default greift sonst
     active: Optional[bool] = None
     total_amount_received: Optional[float] = None
+
 
 class MemberUpdate(BaseModel):
     name: Optional[str] = None
@@ -27,6 +31,7 @@ class MemberUpdate(BaseModel):
     join_date: Optional[date] = None
     active: Optional[bool] = None
     total_amount_received: Optional[float] = None
+
 
 class MemberRead(MemberBase):
     id: int

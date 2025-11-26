@@ -1,6 +1,7 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
 from typing import Optional
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -14,7 +15,9 @@ class Settings(BaseSettings):
     # ========================
     PROJECT_NAME: str = "CSC-Backend"
     API_V1_STR: str = "/api/v1"
-    ENVIRONMENT: str = Field(default="development")  # Nützlich für Logs/Conditional Logic
+    ENVIRONMENT: str = Field(
+        default="development"
+    )  # Nützlich für Logs/Conditional Logic
 
     APP_HOST: str = "0.0.0.0"  # Host für Uvicorn
     APP_PORT: int = 8000  # Port für Uvicorn
@@ -58,7 +61,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         case_sensitive=True,  # Variablen-Namen sind Groß-/Kleinschreibung-sensitiv
         env_file=".env",  # Einstellungen aus der .env-Datei laden
-        extra="ignore"  # Unnötige Variablen (wie POSTGRES_USER, ALEMBIC_...) in .env ignorieren
+        extra="ignore",  # Unnötige Variablen (wie POSTGRES_USER, ALEMBIC_...) in .env ignorieren
     )
 
 

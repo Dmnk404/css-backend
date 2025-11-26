@@ -1,5 +1,6 @@
 import pytest
 
+
 # -------------------------------
 # 🔹 Registrierungstests
 # -------------------------------
@@ -8,7 +9,7 @@ def test_register_user_success(client):
     user_data = {
         "username": "unique_success_user",
         "email": "unique_success_user@example.com",
-        "password": "securepassword123"
+        "password": "securepassword123",
     }
 
     response = client.post("/auth/register", json=user_data)
@@ -22,7 +23,7 @@ def test_register_user_duplicate(client):
     user_data = {
         "username": "duplicate_user",
         "email": "duplicate_user@example.com",
-        "password": "securepassword123"
+        "password": "securepassword123",
     }
 
     # 1️⃣ Benutzer erfolgreich registrieren
@@ -41,12 +42,14 @@ def test_register_user_duplicate(client):
 @pytest.mark.parametrize(
     "username,password,expected_status,expect_token",
     [
-        ("testuser_login_success", "correctpw", 200, True),   # ✅ Erfolgreicher Login
-        ("testuser_login_fail", "wrongpw", 401, False),       # ❌ Falsches Passwort
-        ("nonexistent_user", "anypw", 401, False),            # ❌ Unbekannter Benutzer
+        ("testuser_login_success", "correctpw", 200, True),  # ✅ Erfolgreicher Login
+        ("testuser_login_fail", "wrongpw", 401, False),  # ❌ Falsches Passwort
+        ("nonexistent_user", "anypw", 401, False),  # ❌ Unbekannter Benutzer
     ],
 )
-def test_login_and_token_creation(client, username, password, expected_status, expect_token):
+def test_login_and_token_creation(
+    client, username, password, expected_status, expect_token
+):
     """Testet Login und JWT-Token-Generierung unter verschiedenen Bedingungen."""
 
     # 1️⃣ Benutzer anlegen (nur für Erfolgsfall)
@@ -54,10 +57,12 @@ def test_login_and_token_creation(client, username, password, expected_status, e
         register_payload = {
             "username": username,
             "email": f"{username}@example.com",
-            "password": password
+            "password": password,
         }
         r = client.post("/auth/register", json=register_payload)
-        assert r.status_code == 201, f"Registrierung für Testuser {username} fehlgeschlagen: {r.text}"
+        assert (
+            r.status_code == 201
+        ), f"Registrierung für Testuser {username} fehlgeschlagen: {r.text}"
 
     # 2️⃣ Login-Anfrage senden (Form-encoded!)
     login_data = {

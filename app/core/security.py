@@ -1,13 +1,13 @@
+import hashlib
 import os
 import secrets
-import hashlib
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from passlib.context import CryptContext
-from jose import JWTError, jwt
 from dotenv import load_dotenv
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
 load_dotenv()
 
@@ -43,7 +43,9 @@ def create_access_token(username: str) -> str:
 
 
 # --- JWT token validation ---
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+):
     """Extracts and validates the current user from the provided JWT token."""
     token = credentials.credentials
     try:

@@ -1,8 +1,7 @@
-import pytest
-import os
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
+
 from app.core.security import generate_reset_token, hash_reset_token, verify_reset_token
-from app.models import PasswordResetToken, User, Role
+from app.models import PasswordResetToken, Role, User
 
 
 def test_generate_and_verify_reset_token(db_session):
@@ -24,7 +23,7 @@ def test_create_password_reset_entry(db_session):
         username="testuser",
         email="test@example.com",
         hashed_password="hashedpw",
-        role_id=role.id
+        role_id=role.id,
     )
     db_session.add(user)
     db_session.commit()
@@ -34,15 +33,15 @@ def test_create_password_reset_entry(db_session):
     expires = datetime.now(UTC) + timedelta(minutes=15)
 
     reset_token = PasswordResetToken(
-        hashed_token=hashed_token,
-        user_id=user.id,
-        expires_at=expires
+        hashed_token=hashed_token, user_id=user.id, expires_at=expires
     )
 
     db_session.add(reset_token)
     db_session.commit()
 
-    saved_token = db_session.query(PasswordResetToken).filter_by(user_id=user.id).first()
+    saved_token = (
+        db_session.query(PasswordResetToken).filter_by(user_id=user.id).first()
+    )
     assert saved_token is not None
     assert verify_reset_token(plain_token, saved_token.hashed_token)
 
@@ -59,18 +58,22 @@ def test_password_reset_flow(client, db_session, monkeypatch):
         username="flowuser",
         email="flow@example.com",
         hashed_password="hashedpw",
-        role_id=role.id
+        role_id=role.id,
     )
     db_session.add(user)
     db_session.commit()
 
     # 2. Request password reset
-    response = client.post("/auth/password-reset-request", json={"email": "flow@example.com"})
+    response = client.post(
+        "/auth/password-reset-request", json={"email": "flow@example.com"}
+    )
     assert response.status_code == 200
 
     # ✅ TESTMODE: The real token is returned
     response_data = response.json()
-    assert "test_token" in response_data, f"Expected 'test_token' in response, got: {response_data}"
+    assert (
+        "test_token" in response_data
+    ), f"Expected 'test_token' in response, got: {response_data}"
     token = response_data["test_token"]
 
     # 3. Get token from DB (simulating email link) - zur Validierung
@@ -78,10 +81,7 @@ def test_password_reset_flow(client, db_session, monkeypatch):
     assert db_token is not None
 
     # 4. Reset password with the token
-    reset_data = {
-        "token": token,
-        "new_password": "newsecret123"
-    }
+    reset_data = {"token": token, "new_password": "newsecret123"}
     response = client.post("/auth/reset-password", json=reset_data)
     assert response.status_code == 200
 

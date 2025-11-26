@@ -1,5 +1,7 @@
-from sqlalchemy import Column, Integer, String, Date, Boolean, Numeric, DateTime, func
+from sqlalchemy import Boolean, Column, Date, DateTime, Integer, Numeric, String, func
+
 from app.db import Base
+
 
 class Member(Base):
     __tablename__ = "members"
@@ -15,7 +17,9 @@ class Member(Base):
 
     join_date = Column(Date, server_default=func.current_date(), nullable=False)
     active = Column(Boolean, server_default="true", nullable=False)
-    total_amount_received = Column(Numeric(10, 2), server_default="0.00", nullable=False)
+    total_amount_received = Column(
+        Numeric(10, 2), server_default="0.00", nullable=False
+    )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

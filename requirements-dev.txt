@@ -1,0 +1,10 @@
+pre-commit
+black
+ruff
+isort
+detect-secrets
+safety
+pytest
+pytest-asyncio
+httpx
+coverage

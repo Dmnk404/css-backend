@@ -1,10 +1,13 @@
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import NoResultFound  # Neu hinzugefügt für präzisere Fehlerbehandlung
 from fastapi import HTTPException, status
-from app.models.user import User
-from app.models.role import Role
-from app.schemas.user import UserCreate
+from sqlalchemy.exc import (
+    NoResultFound,  # Neu hinzugefügt für präzisere Fehlerbehandlung
+)
+from sqlalchemy.orm import Session
+
 from app.core.security import get_password_hash
+from app.models.role import Role
+from app.models.user import User
+from app.schemas.user import UserCreate
 
 
 class UserService:
@@ -23,7 +26,7 @@ class UserService:
             # Dies ist die Fehlermeldung, die der Test 500 ausgelöst hat!
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Standardrolle 'User' nicht in der Datenbank gefunden. Bitte Datenbank-Seeding prüfen."
+                detail="Standardrolle 'User' nicht in der Datenbank gefunden. Bitte Datenbank-Seeding prüfen.",
             )
 
     # ----------------------------------------------------
@@ -33,9 +36,13 @@ class UserService:
         """Erstellt einen neuen Benutzer und weist ihm die Standardrolle zu."""
 
         # 1. Prüfen auf existierenden Benutzer (Username ODER E-Mail)
-        existing_user = db.query(User).filter(
-            (User.username == user_data.username) | (User.email == user_data.email)
-        ).first()
+        existing_user = (
+            db.query(User)
+            .filter(
+                (User.username == user_data.username) | (User.email == user_data.email)
+            )
+            .first()
+        )
 
         if existing_user:
             raise HTTPException(
@@ -55,7 +62,7 @@ class UserService:
             username=user_data.username,
             email=user_data.email,
             hashed_password=hashed_pw,
-            role_id=default_role.id
+            role_id=default_role.id,
         )
 
         db.add(new_user)

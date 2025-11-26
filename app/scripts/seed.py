@@ -13,13 +13,14 @@ Make sure to run migrations first:
   docker-compose exec app alembic upgrade head
 """
 from datetime import date
-from app.db import SessionLocal
+
 from app.core.security import get_password_hash
+from app.db import SessionLocal
+from app.models.member import Member
 
 # Import models (adjust if your repo exports differently)
 from app.models.role import Role
 from app.models.user import User
-from app.models.member import Member
 
 EXAMPLE_MEMBERS = [
     {
@@ -51,6 +52,7 @@ EXAMPLE_MEMBERS = [
     },
 ]
 
+
 def main():
     db = SessionLocal()
     try:
@@ -70,7 +72,7 @@ def main():
                 username="admin",
                 email="admin@example.com",
                 hashed_password=get_password_hash("adminpass"),
-                role=role
+                role=role,
             )
             db.add(admin)
             db.commit()
@@ -104,6 +106,7 @@ def main():
         print("Seed failed:", e)
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     main()
