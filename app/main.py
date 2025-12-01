@@ -27,7 +27,7 @@ app.include_router(
 
 
 # --- Healthcheck / Root ---
-@app.get("/", tags=["Root"])
+@app.api_route("/", methods=["GET", "HEAD"], tags=["Root"])  # GEÄNDERT: GET + HEAD
 def root():
     return {"message": "CSC Backend API läuft 🚀"}
 
@@ -35,4 +35,4 @@ def root():
 # NEU: Für Production (Render, Railway, etc.)
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("app.main:app", host="0.0. 0.0", port=port, reload=False)
