@@ -15,40 +15,36 @@ class Settings(BaseSettings):
     # ========================
     PROJECT_NAME: str = "CSC-Backend"
     API_V1_STR: str = "/api/v1"
-    ENVIRONMENT: str = Field(
-        default="development"
-    )  # Nützlich für Logs/Conditional Logic
+    ENVIRONMENT: str = Field(default="development")
 
-    APP_HOST: str = "0.0.0.0"  # Host für Uvicorn
-    APP_PORT: int = 8000  # Port für Uvicorn
-    APP_DEBUG: bool = False  # True für Entwicklung
+    APP_HOST: str = "0. 0.0.0"
+    APP_PORT: int = 8000
+    APP_DEBUG: bool = False
 
     # ========================
     # 2. Datenbank-Einstellungen (PostgreSQL)
     # ========================
-    # Die Hauptverbindungs-URL, die alle Details aus der .env kombiniert (z.B. postgresql://user:pass@host:port/db)
-    DATABASE_URL: str
+    # WICHTIG: Optional für Render (wird zur Laufzeit gesetzt)
+    DATABASE_URL: str = Field(
+        default="postgresql://user:pass@localhost:5432/db"  # Fallback für lokale Entwicklung
+    )
 
-    SQL_ECHO: bool = False  # Schaltet SQLAlchemy-Logging (SQL-Queries) an oder aus
+    SQL_ECHO: bool = False
 
     # ========================
     # 3. Sicherheits-Einstellungen (JWT & Auth)
     # ========================
-    # Der geheime Schlüssel zum Signieren von JWT-Token - MUSS geheim gehalten werden!
-    SECRET_KEY: str
+    SECRET_KEY: str = Field(
+        default="dev-secret-key-change-in-production-min-32-chars-please"
+    )
 
     SECURITY_ALGORITHM: str = "HS256"
-
-    # Gültigkeitsdauer des Access Tokens in Minuten (z.B. 60 * 24 = 24 Stunden)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
-
-    # Gültigkeitsdauer des Passwort-Reset-Tokens in Minuten
-    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 60  # 1 Stunde
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 60
 
     # ========================
     # 4. Mail-Einstellungen (Optional)
     # ========================
-    # Diese Felder sind optional, falls du sie später für Passwort-Resets o.ä. brauchst.
     MAIL_SERVER: Optional[str] = None
     MAIL_PORT: Optional[int] = None
     MAIL_USERNAME: Optional[str] = None
@@ -59,9 +55,10 @@ class Settings(BaseSettings):
     # Pydantic Konfiguration
     # ========================
     model_config = SettingsConfigDict(
-        case_sensitive=True,  # Variablen-Namen sind Groß-/Kleinschreibung-sensitiv
-        env_file=".env",  # Einstellungen aus der .env-Datei laden
-        extra="ignore",  # Unnötige Variablen (wie POSTGRES_USER, ALEMBIC_...) in .env ignorieren
+        case_sensitive=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
 

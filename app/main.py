@@ -1,3 +1,6 @@
+import os
+
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -27,3 +30,9 @@ app.include_router(
 @app.get("/", tags=["Root"])
 def root():
     return {"message": "CSC Backend API läuft 🚀"}
+
+
+# NEU: Für Production (Render, Railway, etc.)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)
