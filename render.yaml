@@ -2,9 +2,10 @@ services:
   - type: web
     name: css-backend
     env: python
-    runtime: python-3.12
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python -m uvicorn app.main:app --host 0.0. 0.0 --port $PORT --workers 1 --log-level info"
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements. txt
+    startCommand: sh -c "alembic upgrade head && python app/scripts/seed. py && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -18,8 +19,12 @@ services:
         value: "1440"
       - key: ENVIRONMENT
         value: production
+      - key: PYTHONUNBUFFERED
+        value: "1"
 
 databases:
   - name: css-db
     databaseName: css_backend
     user: css_user
+    region: frankfurt
+    plan: free
