@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
             print("🌱 Running seed script...")
             # FIX: Nutze -m flag für korrekten Python-Pfad
             subprocess.run(
-                ["python", "-m", "app. scripts.seed"],  # GEÄNDERT
+                ["python", "-m", "app.scripts.seed"],  # GEÄNDERT
                 check=True,
                 timeout=30,
                 cwd="/app",  # NEU: Arbeitsverzeichnis setzen
