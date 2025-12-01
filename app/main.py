@@ -19,7 +19,13 @@ async def lifespan(app: FastAPI):
             subprocess.run(["alembic", "upgrade", "head"], check=True, timeout=60)
 
             print("🌱 Running seed script...")
-            subprocess.run(["python", "app/scripts/seed.py"], check=True, timeout=30)
+            # FIX: Nutze -m flag für korrekten Python-Pfad
+            subprocess.run(
+                ["python", "-m", "app. scripts.seed"],  # GEÄNDERT
+                check=True,
+                timeout=30,
+                cwd="/app",  # NEU: Arbeitsverzeichnis setzen
+            )
 
             print("✅ Startup tasks completed!")
         except subprocess.TimeoutExpired:
@@ -27,13 +33,11 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"⚠️ Startup tasks failed: {e}, continuing anyway...")
 
-    yield  # App läuft
-
-    # Cleanup beim Shutdown (falls nötig)
+    yield
     print("👋 Shutting down...")
 
 
-app = FastAPI(title="CSC Backend", version="1.0. 0", lifespan=lifespan)
+app = FastAPI(title="CSC Backend", version="1.0.0", lifespan=lifespan)
 
 # --- CORS ---
 app.add_middleware(

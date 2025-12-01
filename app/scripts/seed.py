@@ -12,13 +12,12 @@ Usage:
 Make sure to run migrations first:
   docker-compose exec app alembic upgrade head
 """
+
 from datetime import date
 
 from app.core.security import get_password_hash
 from app.db import SessionLocal
 from app.models.member import Member
-
-# Import models (adjust if your repo exports differently)
 from app.models.role import Role
 from app.models.user import User
 
@@ -70,7 +69,7 @@ def main():
         if not admin:
             admin = User(
                 username="admin",
-                email="admin@example.com",
+                email="admin@example. com",
                 hashed_password=get_password_hash("adminpass"),
                 role=role,
             )
@@ -79,11 +78,10 @@ def main():
             db.refresh(admin)
             print("Created admin user (username=admin, password=adminpass)")
 
-        # Seed Members only if none exist (to avoid duplicates)
+        # Seed Members
         existing_count = db.query(Member).count()
         if existing_count == 0:
             for m in EXAMPLE_MEMBERS:
-                # double-check unique email
                 if db.query(Member).filter(Member.email == m["email"]).first():
                     continue
                 member = Member(
@@ -94,7 +92,6 @@ def main():
                     city=m["city"],
                     postal_code=m["postal_code"],
                     phone=m.get("phone"),
-                    # join_date, active, total_amount_received, created_at use DB defaults
                 )
                 db.add(member)
             db.commit()
