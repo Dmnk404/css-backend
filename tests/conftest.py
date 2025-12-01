@@ -1,6 +1,7 @@
 import os
 import sys
 from datetime import date
+from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -30,18 +31,17 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 
+# Session factory used both by transactional db_session fixture and by direct helper sessions
 TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
-# Tabellen erstellen
+# Create all tables once for the in-memory DB
 Base.metadata.create_all(bind=engine)
 
 
-# ✅ WICHTIG: Rollen EINMAL initialisieren (nicht in jeder Session)
-def init_roles():
-    """Initialize default roles once."""
+# Initialize roles once
+def init_roles() -> None:
     db = TestingSessionLocal()
     try:
-        # Prüfen ob Rollen bereits existieren
         existing_roles = db.query(Role).count()
         if existing_roles == 0:
             db.add_all(
@@ -55,7 +55,6 @@ def init_roles():
         db.close()
 
 
-# Rollen beim Import initialisieren
 init_roles()
 
 
@@ -65,30 +64,40 @@ init_roles()
 
 
 @pytest.fixture(scope="function")
-def db_session():
-    """Provides a clean database session for each test."""
+def db_session() -> Generator[Session, None, None]:
+    """
+    Provides a clean database session for each test.
+    Uses a transaction/connection pattern so tests are isolated.
+    """
     connection = engine.connect()
     transaction = connection.begin()
     session = TestingSessionLocal(bind=connection)
 
-    # Nur User und Member Tables cleanen, NICHT Roles!
+    # Clean only Users and Members between tests to keep Roles stable
     session.query(User).delete()
     session.query(Member).delete()
     session.commit()
 
-    yield session
-
-    session.close()
-    transaction.rollback()
-    connection.close()
+    try:
+        yield session
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
 
 
 # -------------------------------------------------------
-# Dependency override for FastAPI
+# Dependency override for FastAPI (TestClient -> test DB)
 # -------------------------------------------------------
 
 
-def override_get_db():
+def override_get_db() -> Generator[Session, None, None]:
+    """
+    Default override returns a new session bound to engine.
+    Note: db_session fixture uses a connection-bound session inside a transaction.
+    Tests that need the TestClient to see data created by fixtures must create those rows
+    in a separate session (see admin_user/admin_token below).
+    """
     db = TestingSessionLocal()
     try:
         yield db
@@ -100,23 +109,31 @@ app.dependency_overrides[get_db] = override_get_db
 
 
 @pytest.fixture(scope="module")
-def client():
+def client() -> Generator[TestClient, None, None]:
     """FastAPI TestClient using overridden DB."""
     with TestClient(app) as c:
         yield c
 
 
 # -------------------------------------------------------
-# Utility: user creation
+# Utility: user creation (helper that uses an independent session)
 # -------------------------------------------------------
 
 
-def create_test_user(
+def create_test_user_direct(
     session: Session, username: str, email: str, role_name: str, password: str = "pass"
-):
+) -> User:
+    """
+    Create a user in the given session and commit. This helper is intended
+    to be used with a fresh session (TestingSessionLocal()), not the transactional db_session fixture.
+    """
     role = session.query(Role).filter(Role.name == role_name).first()
     if not role:
         raise ValueError(f"Role '{role_name}' not found.")
+
+    user = session.query(User).filter_by(username=username).first()
+    if user:
+        return user
 
     user = User(
         username=username,
@@ -131,24 +148,67 @@ def create_test_user(
 
 
 # -------------------------------------------------------
-# Auth fixtures
+# Auth fixtures (admin and member)
 # -------------------------------------------------------
 
 
 @pytest.fixture(scope="function")
-def admin_token(client: TestClient, db_session: Session):
-    create_test_user(db_session, "adminuser", "admin@test.com", "Admin", "adminpass")
+def admin_user() -> User:
+    """
+    Create/return an admin user using an independent session (visible to TestClient).
+    Use this fixture in tests needing the User object.
+    """
+    session = TestingSessionLocal()
+    try:
+        return create_test_user_direct(
+            session, "adminuser", "admin@test.com", "Admin", "adminpass"
+        )
+    finally:
+        session.close()
+
+
+@pytest.fixture(scope="function")
+def member_user() -> User:
+    session = TestingSessionLocal()
+    try:
+        return create_test_user_direct(
+            session, "memberuser", "member@test.com", "User", "memberpass"
+        )
+    finally:
+        session.close()
+
+
+@pytest.fixture(scope="function")
+def admin_token(client: TestClient) -> str:
+    """
+    Ensure an admin user exists (created in an independent session) and obtain a valid JWT via the real login endpoint.
+    Creating the user via a fresh session (TestingSessionLocal) makes it immediately visible to the TestClient.
+    """
+    session = TestingSessionLocal()
+    try:
+        create_test_user_direct(
+            session, "adminuser", "admin@test.com", "Admin", "adminpass"
+        )
+    finally:
+        session.close()
 
     login = {"username": "adminuser", "password": "adminpass", "grant_type": "password"}
     response = client.post("/auth/login", data=login)
-
-    assert response.status_code == 200
+    assert (
+        response.status_code == 200
+    ), f"Login in fixture failed: {response.status_code} {response.text}"
     return response.json()["access_token"]
 
 
 @pytest.fixture(scope="function")
-def member_token(client: TestClient, db_session: Session):
-    create_test_user(db_session, "memberuser", "member@test.com", "User", "memberpass")
+def member_token(client: TestClient) -> str:
+    session = TestingSessionLocal()
+    try:
+        create_test_user_direct(
+            session, "memberuser", "member@test.com", "User", "memberpass"
+        )
+    finally:
+        session.close()
 
     login = {
         "username": "memberuser",
@@ -156,8 +216,9 @@ def member_token(client: TestClient, db_session: Session):
         "grant_type": "password",
     }
     response = client.post("/auth/login", data=login)
-
-    assert response.status_code == 200
+    assert (
+        response.status_code == 200
+    ), f"Login in fixture failed: {response.status_code} {response.text}"
     return response.json()["access_token"]
 
 
@@ -167,17 +228,16 @@ def member_token(client: TestClient, db_session: Session):
 
 
 @pytest.fixture(scope="function")
-def existing_member_id(db_session: Session):
+def existing_member_id(db_session: Session) -> int:
     member = Member(
         name="Sample Member",
         birth_date=date(1990, 5, 20),
         email="sample@member.com",
         phone="123456789",
-        address="Test Street",  # ✅ Korrigiert: address statt street
-        postal_code="12345",  # ✅ Korrigiert: postal_code statt zip_code
+        address="Test Street",
+        postal_code="12345",
         city="Test City",
-        # country entfernt, da nicht im Model
-        active=True,  # ✅ Korrigiert: active statt is_active
+        active=True,
     )
     db_session.add(member)
     db_session.commit()

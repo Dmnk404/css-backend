@@ -66,6 +66,10 @@ class MemberService:
 
     def delete_member(self, member: Member) -> None:
         """Löscht ein Mitglied."""
+        if isinstance(member, int):
+            member = self.get_member_by_id(member)
+            if member is None:
+                raise ValueError("Member not found")
         self.db.delete(member)
         self.db.commit()
 
