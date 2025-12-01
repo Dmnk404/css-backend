@@ -42,7 +42,7 @@ EXAMPLE_MEMBERS = [
     },
     {
         "name": "Ada Lovelace",
-        "email": "ada@demo.org",
+        "email": "ada@demo. org",
         "birth_date": date(1992, 12, 10),
         "address": "Algorithmus Allee 3",
         "city": "Codecity",
@@ -55,28 +55,41 @@ EXAMPLE_MEMBERS = [
 def main():
     db = SessionLocal()
     try:
-        # Role 'Member'
-        role = db.query(Role).filter(Role.name == "Member").first()
-        if not role:
-            role = Role(name="Member")
-            db.add(role)
+        # WICHTIG: Erstelle BEIDE Rollen
+        member_role = db.query(Role).filter(Role.name == "Member").first()
+        if not member_role:
+            member_role = Role(name="Member")
+            db.add(member_role)
             db.commit()
-            db.refresh(role)
+            db.refresh(member_role)
             print("Created Role 'Member'")
 
-        # Admin user
+        admin_role = db.query(Role).filter(Role.name == "Admin").first()
+        if not admin_role:
+            admin_role = Role(name="Admin")
+            db.add(admin_role)
+            db.commit()
+            db.refresh(admin_role)
+            print("Created Role 'Admin'")
+
+        # Admin user mit Admin-Rolle!
         admin = db.query(User).filter(User.username == "admin").first()
         if not admin:
             admin = User(
                 username="admin",
-                email="admin@example. com",
+                email="admin@example.com",
                 hashed_password=get_password_hash("adminpass"),
-                role=role,
+                role=admin_role,  # <- GEÄNDERT: Admin-Rolle!
             )
             db.add(admin)
             db.commit()
             db.refresh(admin)
-            print("Created admin user (username=admin, password=adminpass)")
+            print("Created admin user (username=admin, password=adminpass) with Admin role")
+        elif admin.role.name != "Admin":
+            # Falls Admin bereits existiert aber falsche Rolle hat
+            admin.role = admin_role
+            db.commit()
+            print("Updated admin user to Admin role")
 
         # Seed Members
         existing_count = db.query(Member).count()
